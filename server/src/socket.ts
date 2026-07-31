@@ -232,6 +232,7 @@ export function initSocket(server: http.Server, corsOptions: CorsOptions) {
           file: newMsg.file || null,
         });
       } catch (err) {
+        console.log("chat_message error:", err);
         if (typeof callback === "function") {
           callback({
             status: "ERROR",
