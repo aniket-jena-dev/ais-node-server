@@ -26,8 +26,14 @@ export function initSocket(server: http.Server, corsOptions: CorsOptions) {
     console.log("[socket] Redis adapter not initialized");
   } else {
     try {
-      const pubClient = new Redis(process.env.REDIS_URL);
+      const pubClient = new Redis(process.env.REDIS_URL, {
+        maxRetriesPerRequest: 3
+      });
       const subClient = pubClient.duplicate();
+      pubClient.on('error', (err) => console.error('[redis:pub] error', err));
+      subClient.on('error', (err) => console.error('[redis:sub] error', err));
+      pubClient.on('connect', () => console.log('[redis:pub] connected'));
+      subClient.on('connect', () => console.log('[redis:sub] connected'));
       io = new Server(server, {
         cors: corsOptions,
         adapter: createAdapter(pubClient, subClient),
