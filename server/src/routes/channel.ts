@@ -559,6 +559,7 @@ channelRouter.post("/:id/upload", auth, async (req, res) => {
     fileName: signedUpload.fileName,
     contentType: signedUpload.contentType,
     size: signedUpload.size,
+    requiredUploadHeaders: signedUpload.requiredUploadHeaders,
   });
 });
 

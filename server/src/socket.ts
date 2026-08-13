@@ -155,7 +155,7 @@ export function initSocket(server: http.Server, corsOptions: CorsOptions) {
     socket.on("chat_message", async (payload, callback) => {
       const schema = z.object({
         channelId: z.string(),
-        content: z.string().min(1).max(1000),
+        content: z.string().optional(),
         replyTo: z.string().optional(),
         file: z
           .object({
@@ -165,7 +165,17 @@ export function initSocket(server: http.Server, corsOptions: CorsOptions) {
             url: z.string(),
           })
           .optional(),
-      });
+      }).superRefine(({ content, file }, ctx) => {
+        if (!file && content?.length === 0) {
+          ctx.addIssue({
+            path: ["content"],
+            message: "Content is required when no file is provided",
+            code: "custom",
+          });
+          return
+        }
+      })
+
       const parsed = schema.safeParse(payload);
       if (!parsed.success) {
         callback({
