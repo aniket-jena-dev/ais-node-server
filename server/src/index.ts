@@ -33,6 +33,9 @@ const envSchema = z.object({
   // Comma-separated list, e.g. "https://app.example.com,https://admin.example.com"
   ALLOWED_ORIGINS: z.string().min(1, "ALLOWED_ORIGINS is required"),
   COOKIE_SECRET: z.string().min(1).optional(),
+  GCS_BUCKET_NAME: z.string().min(1).optional(),
+  GCS_PROJECT_ID: z.string().min(1).optional(),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).optional(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

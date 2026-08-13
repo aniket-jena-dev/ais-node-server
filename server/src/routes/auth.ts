@@ -45,7 +45,7 @@ authRouter.post("/register", async (req, res) => {
     path: "/",
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
     httpOnly: true,
-    sameSite: "none",
+    sameSite: process.env.ENV === "production" ? "none" : "lax",
     secure: process.env.ENV === "production",
   });
 
@@ -95,7 +95,7 @@ authRouter.post("/login", async (req, res) => {
     path: "/",
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
     httpOnly: true,
-    sameSite: "none",
+    sameSite: process.env.ENV === "production"? "none" : "lax",
     secure: process.env.ENV === "production",
   });
 
@@ -114,7 +114,7 @@ authRouter.get("/me", auth, async (req, res) => {
 authRouter.post("/logout", async (req, res) => {
   res.clearCookie("user_auth", {
     path: "/",
-    sameSite: "none",
+    sameSite: process.env.ENV === "production" ? "none" : "lax",
     httpOnly: true,
     secure: process.env.ENV === "production",
   });

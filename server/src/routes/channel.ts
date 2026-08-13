@@ -10,10 +10,7 @@ import { upsertLastRead } from "../utils.js";
 import { UserModel } from "../models/user.js";
 import { onlineUsersList } from "../socket.js";
 import { io } from "../socket.js";
-import sharp from "sharp";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
+import { createSignedUploadUrl } from "../services/gcs.js";
 
 const channelRouter = express.Router();
 
@@ -519,72 +516,51 @@ channelRouter.delete("/:id/members/:memberId", auth, async (req, res) => {
   return res.json({ msg: "Member removed successfully" });
 });
 
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_MIME_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "application/pdf",
-]);
-
-channelRouter.post("/:id/upload", auth, upload.single("file"), async (req, res) => {
+channelRouter.post("/:id/upload", auth, async (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;
-  const file = req.file
 
   const isMember = await ChannelModel.exists({
     _id: id,
-    members: userId
-  })
-
-  if (!file) {
-      return res.status(400).json({ msg: "No file uploaded" });
-  }
+    members: userId,
+  });
 
   if (!isMember) {
     return res.status(403).json({ msg: "You are not a member of this channel" });
   }
 
-  const uploadedFileSchema = z.object({
-    mimetype: z.enum([...ALLOWED_MIME_TYPES] as [string, ...string[]], {
-      message: "Invalid file type",
-    }),
-    size: z
-      .number()
-      .min(1, "File size is too small")
-      .max(MAX_FILE_SIZE, "File size must not exceed 10MB"),
-    path: z.string(),
+  const schema = z.object({
+    fileName: z.string().min(1).max(120),
+    contentType: z.string().min(1),
+    size: z.number().int().min(1).max(10 * 1024 * 1024),
   });
-  const result = uploadedFileSchema.safeParse(file);
 
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ msg: "Malformed upload request" });
+  }
 
-      let finalName: string;
-      let finalMimeType: string;
+  const signedUpload = await createSignedUploadUrl({
+    fileName: parsed.data.fileName,
+    contentType: parsed.data.contentType,
+    size: parsed.data.size,
+  });
+  console.log("Signed upload result:", signedUpload);
 
-      if (file.mimetype.startsWith("image/")) {
-        finalName = `${randomUUID()}.webp`;
-        finalMimeType = "image/webp";
-        await sharp(file.path).webp({ quality: 82 }).toFile(path.join(UPLOAD_DIR, finalName));
-        await fs.unlink(file.path);
-      } else if (file.mimetype === "application/pdf") {
-        finalName = `${randomUUID()}.pdf`;
-        finalMimeType = "application/pdf";
-        await fs.rename(file.path, path.join(UPLOAD_DIR, finalName));
-      } else {
-        await fs.unlink(file.path).catch(() => {});
-        return res.status(400).json({ msg: "Unsupported file type" });
-      }
+  if (!signedUpload.ok) {
+    return res.status(400).json({ msg: signedUpload.message });
+  }
 
-      return res.json({
-        msg: "File uploaded successfully",
-          size: file.size,
-          type: finalMimeType,
-          name: file.originalname,
-          url: `/uploads/${finalName}`,
-      });
+  return res.json({
+    msg: "Upload URL generated",
+    uploadUrl: signedUpload.uploadUrl,
+    fileUrl: signedUpload.fileUrl,
+    objectName: signedUpload.objectName,
+    fileName: signedUpload.fileName,
+    contentType: signedUpload.contentType,
+    size: signedUpload.size,
+    requiredUploadHeaders: signedUpload.requiredUploadHeaders,
+  });
 });
 
 export default channelRouter;
